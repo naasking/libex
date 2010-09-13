@@ -20,8 +20,12 @@
  * FINALLY { ... }
  *
  * NOTES:
- * -If you use TRY, you SHOULD specify an OTHERWISE branch.
- * -If you use LET or ENSURE, you MUST NOT specify an OTHERWISE branch.
+ * # FINALLY *must* always come last.
+ * # If you use TRY, you *should* specify an OTHERWISE branch.
+ * # If you use LET or ENSURE, you *must not* specify an OTHERWISE branch.
+ * # You *cannot* use any control-flow operators, ie. goto, break, continue,
+ *   return, that will *escape* an exception block. Any control-flow that stays
+ *   within the same exception block is fine.
  */
 
 #ifndef __LIBEX__
