@@ -39,10 +39,28 @@
  *    exception propagation/stack unwinding.
  *
  * FIXME:
- * # what to do for cases of possible duplicate error values? If they have the same value
+ * # What to do for cases of possible duplicate error values? If they have the same value
  *   clients will get compile-time errors about duplicate cases. If they don't have the same
  *   value, we cannot distinguish between the cases. This only matters if errno could ever
  *   possibly take on either value after a single function call.
+ * # Optionally intercept and handle signals? ie. catch div-by-zero and set errno.
+ * # Better integration with C libs: TRY form checks for 0 return value on success, LET
+ *   form checks for NULL return value. ENSURE checks a user-provided bool expression. TRY
+ *   must first set errno = 0. There are 4 cases:
+ *   1. expression returns error code directly.           => CALL  (TRY)
+ *   2. expression returns success/fail == 0/-1.          => TRY   (TRYS)
+ *   3. expression returns success/fail == non-NULL/NULL. => LET   (TRYN)
+ *   4. set errno = 0, call function, check errno.        => CHECK (TRYE)
+ * # Prevent user from forgetting the OTHERWISE branch?
+ * # Microsoft has it's own type of return codes (maybe a TRYW for Windows only?):
+ *   http://en.wikipedia.org/wiki/HRESULT
+ *   http://msdn.microsoft.com/en-us/library/ms691242.aspx
+ *   The HRESULT is definitely interesting, as it conveys significantly more information
+ *   than simple return codes.
+ * # OpenSSL allegedly has a sophisticated error system:
+ *   http://landheer-cieslak.com/wordpress/error-handling-in-c/
+ * # Can this approach support early exits? How to throw exceptions? I believe a form like
+ *   THROW_WHEN(condition, exc_type) will be needed.
  */
 
 #include <stdlib.h>
