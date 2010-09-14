@@ -8,15 +8,15 @@
  * char *foo;
  * LET (foo = (char*)malloc(123)) {
  *   ... do something with foo
- * } CATCH (NullRefExc) {
+ * } CATCH (ENullRef) {
  *   ... handle error for foo
  * } FINALLY {
  *   ... finalize any state that has already been allocated
  * }
  *
  * TRY (returnExceptionType()) { ... }
- * CATCH (ReadExc) { ... }
- * CATCH (WriteExc) { ... }
+ * CATCH (EBadDescriptor) { ... }
+ * CATCH (EFileExists) { ... }
  * FINALLY { ... }
  *
  * NOTES:
@@ -40,14 +40,106 @@
 
 #include <stdlib.h>
 #include <limits.h>
+#include <errno.h>
 
+/*
+ * Define meaningful names for all exception types based on standard POSIX:
+ * http://www.opengroup.org/onlinepubs/9699919799/basedefs/errno.h.html
+ */
 typedef enum exc_type {
-	NullRefExc = (int)NULL,
-	EnsureViolatedExc = 0,	/* ENSURE(COND): COND is false means it's zero */
-	ReadExc,
-	WriteExc,
-	/* ... */
-	NoExc = INT_MAX,
+	ENullRef = (int)NULL,
+	EEnsureViolated = 0,	/* ENSURE(B): B == zero when false */
+	ETooManyArgs = E2BIG,
+	EPermissionDenied = EACCES,
+	EAddressInUse = EADDRINUSE,
+	EAddressUnavailable = EADDRNOTAVAIL,
+	EAddressFamilyUnsupported = EAFNOSUPPORT,
+	EResourceUnavailable = EAGAIN, /* may == EWOULDBLOCK */
+	EConnectionInProgress = EALREADY,
+	EBadDescriptor = EBADF,
+	EBadMessage = EBADMSG,
+	EResourceBusy = EBUSY,
+	ECanceled = ECANCELED,
+	ENoChildProcesses = ECHILD,
+	EConnectionAborted = ECONNABORTED,
+	EConnectionRefused = ECONNREFUSED,
+	EConnectionReset = ECONNRESET,
+	EDeadlock = EDEADLK,
+	EAddressRequired = EDESTADDRREQ,
+	EOutOfRange = EDOM,
+	/* Reserved: EDQUOT */
+	EFileExists = EEXIST,
+	EBadAddress = EFAULT,
+	EFileTooBig = EFBIG,
+	EUnreachable = EHOSTUNREACH,
+	EIdentifierRemoved = EIDRM,
+	EIllegalByteSequence = EILSEQ,
+	EInProgress = EINPROGRESS,
+	EInterrupted = EINTR,
+	EArgumentInvalid = EINVAL,
+	EIOError = EIO,
+	EDisconnected = EISCONN,
+	EIsDirectory = EISDIR,
+	ETooManyLevels = ELOOP,
+	EDescriptorTooBig = EMFILE,
+	ETooManyLinks = EMLINK,
+	EMessageTooBig = EMSGSIZE,
+	/* Reserved: EMULTIHOP */
+	ENameTooLong = ENAMETOOLONG,
+	ENetworkDown = ENETDOWN,
+	ENetworkAborted = ENETRESET,
+	ENetworkUnreachable = ENETUNREACH,
+	ETooManyOpenFiles = ENFILE,
+	EBufferUnavailable = ENOBUFS,
+#ifdef ENODATA
+	ENoData = ENODATA,
+#endif
+	EDeviceNotFound = ENODEV,
+	EPathNotFound = ENOENT,
+	EInvalidExecutable = ENOEXEC,
+	ENoLocks = ENOLCK,
+	/* Reserved: ENOLINK */
+	EOutOfMemory = ENOMEM,
+	EMessageNotFound = ENOMSG,
+	EProtocolUnavailable = ENOPROTOOPT,
+	ENoSpaceOnDevice = ENOSPC,
+#ifdef ENOSR
+	ENoStreamResources = ENOSR,
+#endif
+#ifdef ENOSTR
+	EInvalidStream = ENOSTR,
+#endif
+	EFunctionUnsupported = ENOSYS,
+	ESocketNotConnected = ENOTCONN,
+	EInvalidDirectory = ENOTDIR,
+	EDirectoryNotEmpty = ENOTEMPTY,
+	EUnrecoverable = ENOTRECOVERABLE,
+	EInvalidSocket = ENOTSOCK,
+	EUnsupported = ENOTSUP, /* may == EOPNOTSUPP */
+	EInvalidIOControl = ENOTTY,
+	EInvalidDeviceOrAddress = ENXIO,
+	EInvalidSocketOp = EOPNOTSUPP, /* may == ENOTSUPP */
+	EOverflow = EOVERFLOW,
+	EOwnerUnvailable = EOWNERDEAD,
+	EInvalidOp = EPERM,
+	EBrokenPipe = EPIPE,
+	EProtocolError = EPROTO,
+	EProtocolUnsupported = EPROTONOSUPPORT,
+	EProtocolInvalid = EPROTOTYPE,
+	EResultTooBig = ERANGE,
+	EReadOnly = EROFS,
+	EInvalidSeek = ESPIPE,
+	EProcessNotFound = ESRCH,
+	/* Reserved: ESTALE */
+#ifdef ETIME
+	EStreamTimeout = ETIME,
+#endif
+	ETimedout = ETIMEDOUT,
+	EFileBusy = ETXTBSY,
+	EWouldBlock = EWOULDBLOCK, /* may == EAGAIN */
+	ECrossDeviceLink = EXDEV,
+
+	ENoError = INT_MAX,
 } exc_type;
 
 /*
@@ -73,7 +165,7 @@ typedef enum exc_type {
  * FINALLY terminates the exception handling block and must always appear, even
  * if no finalization code is necessary.
  */
-#define TRY(X) _EXCOPEN(X) CATCH(NoExc)
+#define TRY(X) _EXCOPEN(X) CATCH(ENoError)
 #define _EXCOPEN(X) do { switch ((int)(X)) {
 #define LET(X) _EXCOPEN(X) default:
 #define ENSURE(X) LET(X)
