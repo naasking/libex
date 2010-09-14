@@ -160,8 +160,8 @@ typedef enum exc_type {
  *
  * LET takes an expression returning a pointer type, and is generally used for
  * bindings. The body of the LET is the "default" case in the switch. The only
- * exception thrown by LET is NullRefExc. Since NULL and NullRefExc have the
- * same value, an assignment of NULL will branch to the NullRefExc case.
+ * exception thrown by LET is ENullRef. Since NULL and ENullRef have the
+ * same value, an assignment of NULL will branch to the ENullRef case.
  * Otherwise, the default case executes becase the value is non-null.
  *
  * ENSURE takes an expression returning true/false, and is generally used for
