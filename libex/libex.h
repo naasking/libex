@@ -2,6 +2,7 @@
  * Simple, local exception handling with binding forms.
  *
  * LICENSE: LGPL
+ * Copyright 2010: Sandro Magi
  *
  * Examples:
  *
@@ -36,6 +37,12 @@
  * 1. Compile-time conditional to log the current file, function, and line # on exception.
  * 2. A function definition form that implicitly returns exceptions, and provides
  *    exception propagation/stack unwinding.
+ *
+ * FIXME:
+ * # what to do for cases of possible duplicate error values? If they have the same value
+ *   clients will get compile-time errors about duplicate cases. If they don't have the same
+ *   value, we cannot distinguish between the cases. This only matters if errno could ever
+ *   possibly take on either value after a single function call.
  */
 
 #include <stdlib.h>
@@ -139,7 +146,8 @@ typedef enum exc_type {
 	EWouldBlock = EWOULDBLOCK, /* may == EAGAIN */
 	ECrossDeviceLink = EXDEV,
 
-	ENoError = INT_MAX,
+	/* errno must be a positive value */
+	ENoError = INT_MIN,
 } exc_type;
 
 /*
@@ -166,11 +174,18 @@ typedef enum exc_type {
  * if no finalization code is necessary.
  */
 #define TRY(X) _EXCOPEN(X) CATCH(ENoError)
-#define _EXCOPEN(X) do { switch ((int)(X)) {
+#define _EXCOPEN(X) do { int __ex = (X); switch (__ex) {
 #define LET(X) _EXCOPEN(X) default:
 #define ENSURE(X) LET(X)
 #define CATCH(e) break; case e:
 #define OTHERWISE default:
 #define FINALLY break; } } while(0);
+
+/*
+ * Translate an errno expression into an exception.
+ * X: an expression that sets errno.
+ * C: conditional that determines whether errno was set.
+ */
+#define TRYE(X,C) (X); TRY((C) ? ENoError : errno)
 
 #endif /*__LIBEX__*/
