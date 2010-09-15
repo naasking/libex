@@ -47,10 +47,10 @@
  * # Better integration with C libs: TRY form checks for 0 return value on success, LET
  *   form checks for NULL return value. ENSURE checks a user-provided bool expression. TRY
  *   must first set errno = 0. There are 4 cases:
- *   1. expression returns error code directly.           => CALL  (TRY)
- *   2. expression returns success/fail == 0/-1.          => TRY   (TRYS)
- *   3. expression returns success/fail == non-NULL/NULL. => LET   (TRYN)
- *   4. set errno = 0, call function, check errno.        => CHECK (TRYE)
+ *   1. expression returns error code directly.           => TRY (E_exc_type)
+ *   2. expression returns success/fail == 0/-1/!0.       => ENSURE (E_int)
+ *   3. expression returns success/fail == non-NULL/NULL. => LET (E_void*)
+ *   4. set errno = 0, call function, check errno.        => TRYE (E_void)
  * # Prevent user from forgetting the OTHERWISE branch?
  * # Microsoft has it's own type of return codes (maybe a TRYW for Windows only?):
  *   http://en.wikipedia.org/wiki/HRESULT
@@ -59,8 +59,36 @@
  *   than simple return codes.
  * # OpenSSL allegedly has a sophisticated error system:
  *   http://landheer-cieslak.com/wordpress/error-handling-in-c/
- * # Can this approach support early exits? How to throw exceptions? I believe a form like
- *   THROW_WHEN(condition, exc_type) will be needed.
+ *   If uses a compile-time allocated error queue that stores various information.
+ * # This approach can support early exits with THROW = break, assuming there's a top-level
+ *   exc_type local in the function. THROW sets the local, then executes a break, which exits
+ *   the switch early, execs the finalizer, and proceeds to the next block (which is a
+ *   finalizer or a RETURN(X). This means there can be no code after an exception handler,
+ *   because this code will assume successful completion of the block with no errors, which
+ *   isn't the case. Each CATCH block must set exc_type=ENoError. Each TRY is wrapped in an
+ *   conditional that first checks that exc_type=ENoError. This supports pre-condition checks
+ *   which run before any exception, and may throw exceptions, ie.
+ *     if (check) THROW(ArgumentInvalid);
+ *   This may require a new terminator ENDTRY to close the conditional. Or perhaps can encode
+ *   whether we are in an exception block at the time THROW was invoked via a bit in exc_type.
+ *   If the bit is not set, FINALLY can simply exec: if (BIT(exc_type)) break; This doesn't
+ *   handle the case of two exception blocks one after the other.
+ *
+ * = Traditional Exception Handling w/ unwinding and THROW =
+ * -Each function has an EXC_BEGIN(T) which declares an "exc_type", and a value for the return
+ *  type T. Alternately, provide a function definition macro, ie. DEF(fname, .../args/), which
+ *  declares this local.
+ * -Each exception block sets the exc_type local, and is wrapped in an infinite loop around
+ *  the switch on that local.
+ * -Each CATCH "breaks" from the loop.
+ * -FINALLY is right after the loop.
+ * -THROW sets the exc_type local and executes a "continue", which retries the exception
+ *  handling switch. If matched, exec that block. If no match, set flag, and exec finalizer
+ *  for cleanup which contains a test that checks the flag and execs a "continue" in
+ *  the outer exception handling loop.
+ * -Non-exceptional exits from blocks sets exc_type to ENoError.
+ * -If at top-level, then return exc_type, perhaps using a RETURN(x) macro. This will have
+ *  to be overloaded based on the 4 error cases typically used in C.
  */
 
 #include <stdlib.h>
