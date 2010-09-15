@@ -44,13 +44,13 @@
  *   value, we cannot distinguish between the cases. This only matters if errno could ever
  *   possibly take on either value after a single function call.
  * # Optionally intercept and handle signals? ie. catch div-by-zero and set errno.
- * # Better integration with C libs: TRY form checks for 0 return value on success, LET
- *   form checks for NULL return value. ENSURE checks a user-provided bool expression. TRY
- *   must first set errno = 0. There are 4 cases:
- *   1. expression returns error code directly.           => TRY (E_exc_type)
- *   2. expression returns success/fail == 0/-1/!0.       => ENSURE (E_int)
- *   3. expression returns success/fail == non-NULL/NULL. => LET (E_void*)
- *   4. set errno = 0, call function, check errno.        => TRYE (E_void)
+ * # Better integration with C libs. There are 4 general cases, 2 specific:
+ *   1. expression returns error code directly.        => TRY (E_exc_type) => switch(E_exc_type) ...
+ *   2. expression returns success/fail == 0/-1/!0.    => ENSURE (E_int)   => switch(E_int == 0 ? ENoError : errno) ...
+ *   3. expression returns success/fail == !NULL/NULL. => LET (E_void*)    => switch(E_void* ? ENoError : errno) ...
+ *   4. set errno = 0, call function, check errno.     => DOCHECK (E_void) => errno=0; (E_void); switch(errno) ...
+ *   5. Windows-only: check HRESULT:				   => WTRY(HRESULT)    => switch(SUCCESS(HRESULT) ? ENoError : HRESULT_CODE(HRESULT)) ...
+ *   NOTE: Windows system error codes can just use TRY: http://msdn.microsoft.com/en-us/library/ms681382.aspx
  * # Prevent user from forgetting the OTHERWISE branch?
  * # Microsoft has it's own type of return codes (maybe a TRYW for Windows only?):
  *   http://en.wikipedia.org/wiki/HRESULT
