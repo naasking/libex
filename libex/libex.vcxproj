@@ -76,6 +76,9 @@
   <ItemGroup>
     <ClInclude Include="libex.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="tests.c" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

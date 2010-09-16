@@ -46,23 +46,23 @@
  * # Optionally intercept and handle signals? ie. catch div-by-zero and set errno.
  * # Better integration with C libs. There are 4 general cases, 2 specific:
  *   1. expression returns error code directly.        => TRY (E_exc_type) => switch(E_exc_type) ...
- *   2. expression returns success/fail == 0/-1/!0.    => ENSURE (E_int)   => switch(E_int == 0 ? ENoError : errno) ...
+ *   2. expression returns success/fail == 0/-1 or !0. => ENSURE (E_int)   => switch(E_int == 0 ? ENoError : errno) ...
  *   3. expression returns success/fail == !NULL/NULL. => LET (E_void*)    => switch(E_void* ? ENoError : errno) ...
- *   4. set errno = 0, call function, check errno.     => DOCHECK (E_void) => errno=0; (E_void); switch(errno) ...
+ *   4. set errno = 0, call function, check errno.     => CHECK (E_void)   => errno=0; (E_void); switch(errno) ...
  *   5. Windows-only: check HRESULT:				   => WTRY(HRESULT)    => switch(SUCCESS(HRESULT) ? ENoError : HRESULT_CODE(HRESULT)) ...
  *   NOTE: Windows system error codes can just use TRY: http://msdn.microsoft.com/en-us/library/ms681382.aspx
  * # Prevent user from forgetting the OTHERWISE branch?
- * # Microsoft has it's own type of return codes (maybe a TRYW for Windows only?):
+ * # Microsoft has it's own type of return codes (maybe a HTRY for Windows only?):
  *   http://en.wikipedia.org/wiki/HRESULT
  *   http://msdn.microsoft.com/en-us/library/ms691242.aspx
  *   The HRESULT is definitely interesting, as it conveys significantly more information
  *   than simple return codes.
  * # OpenSSL allegedly has a sophisticated error system:
  *   http://landheer-cieslak.com/wordpress/error-handling-in-c/
- *   If uses a compile-time allocated error queue that stores various information.
+ *   It uses a compile-time allocated error queue that stores various information.
  * # This approach can support early exits with THROW = break, assuming there's a top-level
  *   exc_type local in the function. THROW sets the local, then executes a break, which exits
- *   the switch early, execs the finalizer, and proceeds to the next block (which is a
+ *   the switch early, execs the finalizer, and proceeds to the next bloc, which is a
  *   finalizer or a RETURN(X). This means there can be no code after an exception handler,
  *   because this code will assume successful completion of the block with no errors, which
  *   isn't the case. Each CATCH block must set exc_type=ENoError. Each TRY is wrapped in an
@@ -73,11 +73,19 @@
  *   whether we are in an exception block at the time THROW was invoked via a bit in exc_type.
  *   If the bit is not set, FINALLY can simply exec: if (BIT(exc_type)) break; This doesn't
  *   handle the case of two exception blocks one after the other.
+ * # Alternate approach: try-in-catch, where TRY-IN is wrapped in a do-while, and THROW simply breaks
+ *   out of that loop to the exception handling block. TRY no longer takes an expression form.
+ *   TRY Foo x = MakeFoo(); { ...foo...bar... if (x) THROW(ArgumentInvalid); ... }
+ *   IN { ... }
+ *   CATCH(ArgumentInvalid) { ... }
+ *   FINALLY
+ *
+ *   RETHROW(E) can appear in the OTHERWISE block. Above compiles down to.
  *
  * = Traditional Exception Handling w/ unwinding and THROW =
  * -Each function has an EXC_BEGIN(T) which declares an "exc_type", and a value for the return
- *  type T. Alternately, provide a function definition macro, ie. DEF(fname, .../args/), which
- *  declares this local.
+ *  type T. Alternately, provide a function definition macro, ie. RETURNS(T) DEF(fname, .../args/)
+ *  which declares this local.
  * -Each exception block sets the exc_type local, and is wrapped in an infinite loop around
  *  the switch on that local.
  * -Each CATCH "breaks" from the loop.
@@ -193,7 +201,8 @@ typedef enum exc_type {
 	ECrossDeviceLink = EXDEV,
 
 	/* errno must be a positive value */
-	ENoError = INT_MIN,
+	EEarlyReturn= -1,
+	ENoError = 0,
 } exc_type;
 
 /*
@@ -219,13 +228,52 @@ typedef enum exc_type {
  * FINALLY terminates the exception handling block and must always appear, even
  * if no finalization code is necessary.
  */
-#define TRY(X) _EXCOPEN(X) CATCH(ENoError)
-#define _EXCOPEN(X) do { int __ex = (X); switch (__ex) {
-#define LET(X) _EXCOPEN(X) default:
-#define ENSURE(X) LET(X)
-#define CATCH(e) break; case e:
-#define OTHERWISE default:
+
+/* THROWS(...) declares which exceptions may be thrown, and declares a local to
+ * store the current exception. */
+#define THROWS(...) exc_type THROWS;
+//#define TRY(D) do { THROWS = ENoError; { D; do {
+//#define TRY(D) do { THROWS = ENoError; { D; do
+//#define IN while(0); if (THROWS == ENoError)
+#define VAR do { THROWS = ENoError; { 
+#define TRY do
+#define IN while(0); if (THROWS == ENoError)
+#define HANDLE } switch(THROWS) { case ENoError: case EEarlyReturn: break;
+#define CATCH(e) EXC_CASE(case e)
+#define OTHERWISE EXC_CASE(default)
+#define EXC_CASE(E) THROWS = ENoError; break; E:
 #define FINALLY break; } } while(0);
+#define THROW(E) { THROWS = (exc_type)(E); break; }
+
+#define RETURN THROW(EEarlyReturn)
+#define EXIT return THROWS;
+//#define ERRNO_RETURN(X) do { if (THROWS != ENoError) { errno = THROWS; return -1; } else return 0; } while(0)
+
+//#define DO THROWS =
+//#define _ ; if (THROWS != ENoError) RETHROW;
+//#define DO(E) if ((THROWS = (E)) != ENoError) RETHROW;
+#define MAYBE(E) if ((E) == NULL) THROW(errno);
+
+//TRY DO (callFoo())
+//	if (B) THROW(E)
+//	DO (callBar())
+//IN {
+//
+//} HANDLE
+//  CATCH (E) {
+//}
+
+// old, simple technique
+//#define TRY(X) _EXCOPEN(X) CATCH(ENoError)
+//#define _EXCOPEN(X) do { int __ex = (X); switch (__ex) {
+//#define LET(X) _EXCOPEN(X) default:
+//#define ENSURE(X) LET(X)
+//#define CATCH(e) break; case e:
+//#define OTHERWISE default:
+//#define FINALLY break; } } while(0);
+
+/* this must appear at the beginning of any function that uses exceptions */
+//#define USE_EXC unsigned USE_EXC
 
 /*
  * Translate an errno expression into an exception.
