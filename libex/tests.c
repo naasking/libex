@@ -18,24 +18,21 @@ int randBomb(void)
 exc_type test() {
 	THROWS(EOutOfMemory)
 
-	VAR char *memBuf;
-	TRY {
+	TRY(char *memBuf) {
 		printf("Allocate a memory buffer.\n");
 		MAYBE(memBuf = (char *) malloc(256 * 1024));
 	} IN {
-		VAR FILE *fp;
-		TRY {
+		TRY(FILE *fp) {
 			/* Fifty-bomb. */
 			if (randBomb()) THROW(EUnrecoverable)
 			MAYBE(fp = fopen("dummy-file.txt", "w"));
 		} IN {
-			VAR FILE* sock;
-			TRY {
+			TRY(FILE* sock) {
 				if (randBomb()) THROW(EUnrecoverable)
 				printf("Open a socket.\n");
 				MAYBE(sock = fopen("foo", "r"));
 			} IN {
-
+				/*...*/
 			} HANDLE CATCH (EUnrecoverable) {
 		        fprintf(stderr, "Random exception after fopen()!\n");
 			} OTHERWISE {

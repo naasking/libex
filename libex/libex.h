@@ -233,11 +233,11 @@ typedef enum exc_type {
  * store the current exception. */
 #define THROWS(...) exc_type THROWS;
 //#define TRY(D) do { THROWS = ENoError; { D; do {
-//#define TRY(D) do { THROWS = ENoError; { D; do
-//#define IN while(0); if (THROWS == ENoError)
-#define VAR do { THROWS = ENoError; { 
-#define TRY do
+#define TRY(D) do { THROWS = ENoError; { D; do
 #define IN while(0); if (THROWS == ENoError)
+//#define VAR do { THROWS = ENoError; { 
+//#define TRY do
+//#define IN while(0); if (THROWS == ENoError)
 #define HANDLE } switch(THROWS) { case ENoError: case EEarlyReturn: break;
 #define CATCH(e) EXC_CASE(case e)
 #define OTHERWISE EXC_CASE(default)
