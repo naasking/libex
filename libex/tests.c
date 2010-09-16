@@ -26,7 +26,7 @@ exc_type test() {
 
 	TRY(char *memBuf) {
 		printf("Allocate a memory buffer.\n");
-		MAYBE(memBuf = (char *) malloc(256 * 1024));
+		MAYBE(memBuf = (char *) malloc(256 * 1024), errno);
 	} IN {
 		TRY(FILE *fp) {
 			/* Fifty-bomb. */
