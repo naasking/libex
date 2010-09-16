@@ -22,8 +22,8 @@
  *
  * NOTES:
  * # FINALLY *must* always come last, and must must terminate every exception block.
- * # If you use TRY, you *should* specify an OTHERWISE branch.
- * # If you use LET or ENSURE, you *must not* specify an OTHERWISE branch.
+ * # If you use TRY, you *should* specify an CATCHANY branch.
+ * # If you use LET or ENSURE, you *must not* specify an CATCHANY branch.
  * # You *cannot* use any control-flow operators, ie. goto, break, continue,
  *   return, that will *escape* an exception block. Any control-flow that stays
  *   within the same exception block is fine.
@@ -51,7 +51,7 @@
  *   4. set errno = 0, call function, check errno.     => CHECK (E_void)   => errno=0; (E_void); switch(errno) ...
  *   5. Windows-only: check HRESULT:				   => WTRY(HRESULT)    => switch(SUCCESS(HRESULT) ? ENoError : HRESULT_CODE(HRESULT)) ...
  *   NOTE: Windows system error codes can just use TRY: http://msdn.microsoft.com/en-us/library/ms681382.aspx
- * # Prevent user from forgetting the OTHERWISE branch?
+ * # Prevent user from forgetting the CATCHANY branch?
  * # Microsoft has it's own type of return codes (maybe a HTRY for Windows only?):
  *   http://en.wikipedia.org/wiki/HRESULT
  *   http://msdn.microsoft.com/en-us/library/ms691242.aspx
@@ -80,7 +80,7 @@
  *   CATCH(ArgumentInvalid) { ... }
  *   FINALLY
  *
- *   RETHROW(E) can appear in the OTHERWISE block. Above compiles down to.
+ *   RETHROW(E) can appear in the CATCHANY block. Above compiles down to.
  *
  * = Traditional Exception Handling w/ unwinding and THROW =
  * -Each function has an EXC_BEGIN(T) which declares an "exc_type", and a value for the return
@@ -210,14 +210,14 @@ typedef enum exc_type {
  * each exception becoming a case.
  *
  * TRY takes an expression returning an exc_type. Functions returning normally
- * must return the NoExc exception. OTHERWISE becomes the "default"
+ * must return the NoExc exception. CATCHANY becomes the "default"
  * case of the switch.
  *
  * LET takes an expression returning a pointer type, and is generally used for
  * bindings. The body of the LET is the "default" case in the switch. The only
  * exception thrown by LET is ENullRef. Since NULL and ENullRef have the
  * same value, an assignment of NULL will branch to the ENullRef case.
- * Otherwise, the default case executes becase the value is non-null.
+ * CATCHANY, the default case executes becase the value is non-null.
  *
  * ENSURE takes an expression returning true/false, and is generally used for
  * checks where you want to specify finalization on failure. The body of
@@ -232,51 +232,22 @@ typedef enum exc_type {
 /* THROWS(...) declares which exceptions may be thrown, and declares a local to
  * store the current exception. */
 #define THROWS(...) exc_type THROWS;
-//#define TRY(D) do { THROWS = ENoError; { D; do {
 #define TRY(D) do { THROWS = ENoError; { D; do
 #define IN while(0); if (THROWS == ENoError)
 #define HANDLE } switch(THROWS) { case ENoError: case EEarlyReturn: break;
 #define CATCH(e) EXC_CASE(case e)
-#define OTHERWISE EXC_CASE(default)
+#define CATCHANY EXC_CASE(default)
 #define EXC_CASE(E) THROWS = ENoError; break; E:
 #define FINALLY break; } } while(0);
 #define THROW(E) { THROWS = (exc_type)(E); break; }
 
 #define RETURN THROW(EEarlyReturn)
 #define EXIT return THROWS;
-//#define ERRNO_RETURN(X) do { if (THROWS != ENoError) { errno = THROWS; return -1; } else return 0; } while(0)
+#define __CUR_EXC__ THROWS
 
 //#define DO THROWS =
 //#define _ ; if (THROWS != ENoError) RETHROW;
 //#define DO(E) if ((THROWS = (E)) != ENoError) RETHROW;
 #define MAYBE(E, R) if (NULL == (E)) THROW(R);
-
-//TRY DO (callFoo())
-//	if (B) THROW(E)
-//	DO (callBar())
-//IN {
-//
-//} HANDLE
-//  CATCH (E) {
-//}
-
-// old, simple technique
-//#define TRY(X) _EXCOPEN(X) CATCH(ENoError)
-//#define _EXCOPEN(X) do { int __ex = (X); switch (__ex) {
-//#define LET(X) _EXCOPEN(X) default:
-//#define ENSURE(X) LET(X)
-//#define CATCH(e) break; case e:
-//#define OTHERWISE default:
-//#define FINALLY break; } } while(0);
-
-/* this must appear at the beginning of any function that uses exceptions */
-//#define USE_EXC unsigned USE_EXC
-
-/*
- * Translate an errno expression into an exception.
- * X: an expression that sets errno.
- * C: conditional that determines whether errno was set.
- */
-#define TRYE(X,C) (X); TRY((C) ? ENoError : errno)
 
 #endif /*__LIBEX__*/

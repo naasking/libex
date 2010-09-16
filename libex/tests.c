@@ -47,7 +47,7 @@ exc_type test() {
 					/* ... */
 				} HANDLE CATCH(EUnrecoverable) {
 					fprintf(stderr, "Random exception after shmat()!\n");
-				} OTHERWISE {
+				} CATCHANY {
 					/* semaphore's only available to this process and children. */
 					fprintf(stderr, "sem_init() failed.\n");
 				} FINALLY {
@@ -56,7 +56,7 @@ exc_type test() {
 				}
 			} HANDLE CATCH (EUnrecoverable) {
 		        fprintf(stderr, "Random exception after fopen()!\n");
-			} OTHERWISE {
+			} CATCHANY {
 				fprintf(stderr, "socket() failed.\n");
 			} FINALLY {
 				fclose(fp);
@@ -64,16 +64,16 @@ exc_type test() {
 			}
 		} HANDLE CATCH (EUnrecoverable) {
 			fprintf(stderr, "Random exception after malloc()!\n");
-		} OTHERWISE {
+		} CATCHANY {
 			fprintf(stderr, "fopen() failed.\n");
 		} FINALLY {
 			free(memBuf);
 			printf("Memory buffer freed!\n");
 		}
-	} HANDLE OTHERWISE {
+	} HANDLE CATCHANY {
         fprintf(stderr, "malloc() failed.\n");
     } FINALLY {
-		printf("retVal: %d\n", THROWS);
+		printf("retVal: %d\n", __CUR_EXC__);
 	}
 	EXIT
 }
