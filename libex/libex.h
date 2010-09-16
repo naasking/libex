@@ -198,23 +198,33 @@ typedef enum exc_type {
 /* THROWS(...) declares which exceptions may be thrown, and declares a local to
  * store the current exception. */
 #define THROWS(...) exc_type THROWS = ENoError; do {
+#define DONE } while(0); return THROWS
+
+#define RETURN THROW(EEarlyReturn)
+#define THROW(E) { THROWS = (exc_type)(E); break; }
+#define RETHROW break
+#define EXC_CASE(E) THROWS = ENoError; break; E:
+#define __CUR_EXC__ THROWS
+#define CATCH(e) EXC_CASE(case e)
+#define CATCHANY EXC_CASE(default)
+
+/* utility macros for checking function results */
+#define MAYBE(E, R) if (NULL == (E)) THROW(R);
+
+#ifdef _DEBUG
+
 #define TRY(D) while(THROWS == ENoError) { THROWS = ENoError; { D; do
 #define IN while(0); if (THROWS == ENoError)
 #define HANDLE } switch(THROWS) { case ENoError: case EEarlyReturn: break;
-#define CATCH(e) EXC_CASE(case e)
-#define CATCHANY EXC_CASE(default)
-#define EXC_CASE(E) THROWS = ENoError; break; E:
-#define FINALLY break; } }
-#define RETHROW break
-#define THROW(E) { THROWS = (exc_type)(E); break; }
+#define FINALLY break; } break; }
 
-#define RETURN THROW(EEarlyReturn)
-#define DONE } while(0); return THROWS
-#define __CUR_EXC__ THROWS
+#else
 
-//#define DO THROWS =
-//#define _ ; if (THROWS != ENoError) RETHROW;
-//#define DO(E) if ((THROWS = (E)) != ENoError) RETHROW;
-#define MAYBE(E, R) if (NULL == (E)) THROW(R);
+#define TRY(D) for(THROWS = ENoError; THROWS == ENoError;) { D; 
+#define IN switch (THROWS) { case ENoError: 
+#define HANDLE EXC_CASE(case EEarlyReturn)
+#define FINALLY break; } break; }
+
+#endif /*DEBUG*/
 
 #endif /*__LIBEX__*/
