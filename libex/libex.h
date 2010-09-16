@@ -21,12 +21,13 @@
  * FINALLY { ... }
  *
  * NOTES:
- * # FINALLY *must* always come last, and must must terminate every exception block.
- * # If you use TRY, you *should* specify an CATCHANY branch.
- * # If you use LET or ENSURE, you *must not* specify an CATCHANY branch.
+ * # The full TRY()-IN-HANDLE-FINALLY structure is *mandatory*.
+ * # FINALLY *must* always come last, and must terminate every exception block.
  * # You *cannot* use any control-flow operators, ie. goto, break, continue,
  *   return, that will *escape* an exception block. Any control-flow that stays
- *   within the same exception block is fine.
+ *   within the same exception block is fine, with the following exception:
+ * # You cannot execute a THROW or RETHROW within a loop. Use a flag to exit
+ *   the loop, then throw the desired exception.
  */
 
 #ifndef __LIBEX__
@@ -35,8 +36,6 @@
 /*
  * FUTURE WORK:
  * 1. Compile-time conditional to log the current file, function, and line # on exception.
- * 2. A function definition form that implicitly returns exceptions, and provides
- *    exception propagation/stack unwinding.
  *
  * FIXME:
  * # What to do for cases of possible duplicate error values? If they have the same value
@@ -80,23 +79,6 @@
  *   CATCH(ArgumentInvalid) { ... }
  *   FINALLY
  *
- *   RETHROW(E) can appear in the CATCHANY block. Above compiles down to.
- *
- * = Traditional Exception Handling w/ unwinding and THROW =
- * -Each function has an EXC_BEGIN(T) which declares an "exc_type", and a value for the return
- *  type T. Alternately, provide a function definition macro, ie. RETURNS(T) DEF(fname, .../args/)
- *  which declares this local.
- * -Each exception block sets the exc_type local, and is wrapped in an infinite loop around
- *  the switch on that local.
- * -Each CATCH "breaks" from the loop.
- * -FINALLY is right after the loop.
- * -THROW sets the exc_type local and executes a "continue", which retries the exception
- *  handling switch. If matched, exec that block. If no match, set flag, and exec finalizer
- *  for cleanup which contains a test that checks the flag and execs a "continue" in
- *  the outer exception handling loop.
- * -Non-exceptional exits from blocks sets exc_type to ENoError.
- * -If at top-level, then return exc_type, perhaps using a RETURN(x) macro. This will have
- *  to be overloaded based on the 4 error cases typically used in C.
  */
 
 #include <stdlib.h>
@@ -209,40 +191,24 @@ typedef enum exc_type {
  * An exception handling block expands into a simple switch statement, with
  * each exception becoming a case.
  *
- * TRY takes an expression returning an exc_type. Functions returning normally
- * must return the NoExc exception. CATCHANY becomes the "default"
- * case of the switch.
- *
- * LET takes an expression returning a pointer type, and is generally used for
- * bindings. The body of the LET is the "default" case in the switch. The only
- * exception thrown by LET is ENullRef. Since NULL and ENullRef have the
- * same value, an assignment of NULL will branch to the ENullRef case.
- * CATCHANY, the default case executes becase the value is non-null.
- *
- * ENSURE takes an expression returning true/false, and is generally used for
- * checks where you want to specify finalization on failure. The body of
- * ENSURE is the "default" case of the switch. Expressions that evaluate to 0
- * are considered false in C, and EnsureViolatedExc == 0, thus any false
- * expressions will branch to that case.
- *
  * FINALLY terminates the exception handling block and must always appear, even
  * if no finalization code is necessary.
  */
 
 /* THROWS(...) declares which exceptions may be thrown, and declares a local to
  * store the current exception. */
-#define THROWS(...) exc_type THROWS;
-#define TRY(D) do { THROWS = ENoError; { D; do
+#define THROWS(...) exc_type THROWS; do {
+#define TRY(D) while(THROWS == ENoError) { THROWS = ENoError; { D; do
 #define IN while(0); if (THROWS == ENoError)
 #define HANDLE } switch(THROWS) { case ENoError: case EEarlyReturn: break;
 #define CATCH(e) EXC_CASE(case e)
 #define CATCHANY EXC_CASE(default)
 #define EXC_CASE(E) THROWS = ENoError; break; E:
-#define FINALLY break; } } while(0);
+#define FINALLY break; } }
 #define THROW(E) { THROWS = (exc_type)(E); break; }
 
 #define RETURN THROW(EEarlyReturn)
-#define EXIT return THROWS;
+#define DONE return THROWS; } while(0)
 #define __CUR_EXC__ THROWS
 
 //#define DO THROWS =

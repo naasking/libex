@@ -24,19 +24,21 @@ int randBomb(void)
 exc_type test() {
 	THROWS(EOutOfMemory)
 
+	if (st != NULL) THROW(EArgumentInvalid)
+
 	TRY(char *memBuf) {
 		printf("Allocate a memory buffer.\n");
-		MAYBE(memBuf = (char *) malloc(256 * 1024), errno);
+		MAYBE(memBuf = (char *) malloc(256 * 1024), errno)
 	} IN {
 		TRY(FILE *fp) {
 			/* Fifty-bomb. */
 			if (randBomb()) THROW(EUnrecoverable)
-			MAYBE(fp = fopen("dummy-file.txt", "w"), errno);
+			MAYBE(fp = fopen("dummy-file.txt", "w"), errno)
 		} IN {
 			TRY(FILE* sock) {
 				if (randBomb()) THROW(EUnrecoverable)
 				printf("Open a socket.\n");
-				MAYBE(sock = fopen("foo", "r"), errno);
+				MAYBE(sock = fopen("foo", "r"), errno)
 			} IN {
 				/*...*/
 				TRY() {
@@ -75,7 +77,7 @@ exc_type test() {
     } FINALLY {
 		printf("retVal: %d\n", __CUR_EXC__);
 	}
-	EXIT
+	DONE;
 }
 
 static int main(char ** argv, size_t argc) {
