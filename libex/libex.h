@@ -197,7 +197,7 @@ typedef enum exc_type {
 
 /* THROWS(...) declares which exceptions may be thrown, and declares a local to
  * store the current exception. */
-#define THROWS(...) exc_type THROWS; do {
+#define THROWS(...) exc_type THROWS = ENoError; do {
 #define TRY(D) while(THROWS == ENoError) { THROWS = ENoError; { D; do
 #define IN while(0); if (THROWS == ENoError)
 #define HANDLE } switch(THROWS) { case ENoError: case EEarlyReturn: break;
@@ -205,10 +205,11 @@ typedef enum exc_type {
 #define CATCHANY EXC_CASE(default)
 #define EXC_CASE(E) THROWS = ENoError; break; E:
 #define FINALLY break; } }
+#define RETHROW break
 #define THROW(E) { THROWS = (exc_type)(E); break; }
 
 #define RETURN THROW(EEarlyReturn)
-#define DONE return THROWS; } while(0)
+#define DONE } while(0); return THROWS
 #define __CUR_EXC__ THROWS
 
 //#define DO THROWS =

@@ -22,8 +22,7 @@ int randBomb(void)
 }
 
 exc_type test() {
-	THROWS(EOutOfMemory)
-
+	THROWS(EArgumentInvalid)
 	if (st != NULL) THROW(EArgumentInvalid)
 
 	TRY(char *memBuf) {
@@ -60,6 +59,7 @@ exc_type test() {
 		        fprintf(stderr, "Random exception after fopen()!\n");
 			} CATCHANY {
 				fprintf(stderr, "socket() failed.\n");
+				RETHROW;
 			} FINALLY {
 				fclose(fp);
 				printf("File handle closed!\n");
@@ -68,12 +68,14 @@ exc_type test() {
 			fprintf(stderr, "Random exception after malloc()!\n");
 		} CATCHANY {
 			fprintf(stderr, "fopen() failed.\n");
+			RETHROW;
 		} FINALLY {
 			free(memBuf);
 			printf("Memory buffer freed!\n");
 		}
 	} HANDLE CATCHANY {
         fprintf(stderr, "malloc() failed.\n");
+		RETHROW;
     } FINALLY {
 		printf("retVal: %d\n", __CUR_EXC__);
 	}
