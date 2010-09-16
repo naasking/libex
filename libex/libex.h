@@ -235,9 +235,6 @@ typedef enum exc_type {
 //#define TRY(D) do { THROWS = ENoError; { D; do {
 #define TRY(D) do { THROWS = ENoError; { D; do
 #define IN while(0); if (THROWS == ENoError)
-//#define VAR do { THROWS = ENoError; { 
-//#define TRY do
-//#define IN while(0); if (THROWS == ENoError)
 #define HANDLE } switch(THROWS) { case ENoError: case EEarlyReturn: break;
 #define CATCH(e) EXC_CASE(case e)
 #define OTHERWISE EXC_CASE(default)
@@ -252,7 +249,7 @@ typedef enum exc_type {
 //#define DO THROWS =
 //#define _ ; if (THROWS != ENoError) RETHROW;
 //#define DO(E) if ((THROWS = (E)) != ENoError) RETHROW;
-#define MAYBE(E) if ((E) == NULL) THROW(errno);
+#define MAYBE(E, R) if (NULL == (E)) THROW(R);
 
 //TRY DO (callFoo())
 //	if (B) THROW(E)
