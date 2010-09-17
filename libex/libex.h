@@ -20,7 +20,7 @@
  * errno, and Windows HRESULT.
  *
  * NOTES:
- * # The full TRY()-IN-HANDLE-FINALLY structure is *mandatory*.
+ * # The full TRY(), IN, HANDLE, and FINALLY are all *mandatory*. Everything else is optional.
  * # FINALLY *must* always come last, and must terminate every exception block.
  * # You *cannot* use any control-flow operators, ie. goto, break, continue,
  *   return, that will *escape* an exception block. Any control-flow that stays
@@ -229,6 +229,8 @@ typedef enum exc_type {
 #define TRY(D) { if (THROWS != ENoError) RETHROW; do { { D; do
 #define IN while(0); if (THROWS == ENoError)
 #define HANDLE } switch(THROWS) { case ENoError: case EEarlyReturn: break;
+/* optionally deprecate HANDLE by requiring CATCHANY after IN */
+//#define CATCHANY } switch(THROWS) { case ENoError: case EEarlyReturn: break; EXC_CASE(default)
 
 #else
 
@@ -239,7 +241,9 @@ typedef enum exc_type {
 
 #define TRY(D) { if (THROWS != ENoError) RETHROW; { D; do 
 #define IN while (0); switch (THROWS) { case ENoError: 
-#define HANDLE break; case EEarlyReturn:
+#define HANDLE break; case EEarlyReturn: break;
+/* optionally deprecate HANDLE by requiring CATCHANY after IN */
+//#define CATCHANY break; case EEarlyReturn: break; EXC_CASE(default)
 
 #endif /*_DEBUG*/
 
