@@ -41,7 +41,8 @@
  *   clients will get compile-time errors about duplicate cases. If they don't have the same
  *   value, we cannot distinguish between the cases. This only matters if errno could ever
  *   possibly take on either value after a single function call.
- * # Optionally intercept and handle signals? ie. catch div-by-zero and set errno.
+ * # Optionally intercept and handle signals? ie. catch div-by-zero and set errno. Register the
+ *   signal handler at init time, and just use the ERROR() macro.
  * # Better integration with C libs. There are 4 general cases, 2 specific:
  *   1. expression returns error code directly.        => TRY (E_exc_type) => switch(E_exc_type) ...
  *   2. expression returns success/fail == 0/-1 or !0. => ENSURE (E_int)   => switch(E_int == 0 ? ENoError : errno) ...
