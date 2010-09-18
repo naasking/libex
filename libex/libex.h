@@ -42,7 +42,8 @@
  *   value, we cannot distinguish between the cases. This only matters if errno could ever
  *   possibly take on either value after a single function call.
  * # Optionally intercept and handle signals? ie. catch div-by-zero and set errno. Register the
- *   signal handler at init time, and just use the ERROR() macro.
+ *   signal handler at init time, and just use the ERROR() macro. Need some way to portably
+ *   advance the ip in the event of error.
  * # Better integration with C libs. There are 4 general cases, 2 specific:
  *   1. expression returns error code directly.        => TRY (E_exc_type) => switch(E_exc_type) ...
  *   2. expression returns success/fail == 0/-1 or !0. => ENSURE (E_int)   => switch(E_int == 0 ? ENoError : errno) ...
@@ -202,6 +203,9 @@ typedef enum exc_type {
 #define RETHROW break
 #define EXC_CASE(E) THROWS = ENoError; break; E:
 #define __CUR_EXC__ THROWS
+#define THROWONERROR if (THROWS != ENoError) RETHROW
+/* rethrows unhandled errors so code after the FINALLY block does not execute */
+#define ENDTRY THROWONERROR
 
 /* CATCH and CATCHANY specify handlers for various error types */
 #define CATCH(e) EXC_CASE(case e)
@@ -215,7 +219,7 @@ typedef enum exc_type {
 #define MAYBE(E, R) if (NULL == (E)) THROW(R);
 
 /* ERROR raises the exception E if E evaluates to something other than ENoError */
-#define ERROR(E) THROWS = (E); if (THROWS != ENoError) RETHROW;
+#define ERROR(E) THROWS = (E); THROWONERROR
 
 /* ERRORE raises the exception R if E evaluates to non-zero */
 #define ERRORE(E, R) if ((E)) THROW(R)
@@ -227,7 +231,7 @@ typedef enum exc_type {
 
 #ifdef _DEBUG
 
-#define TRY(D) { if (THROWS != ENoError) RETHROW; do { { D; do
+#define TRY(D) { THROWONERROR; do { { D; do
 #define IN while(0); if (THROWS == ENoError)
 #define HANDLE } switch(THROWS) { case ENoError: case EEarlyReturn: break;
 /* optionally deprecate HANDLE by requiring CATCHANY after IN */
@@ -240,7 +244,7 @@ typedef enum exc_type {
  * unlike DEBUG mode, all CATCH clauses can see the bindings introduced in
  * the TRY block. */
 
-#define TRY(D) { if (THROWS != ENoError) RETHROW; { D; do 
+#define TRY(D) { THROWONERROR; { D; do 
 #define IN while (0); switch (THROWS) { case ENoError: 
 #define HANDLE break; case EEarlyReturn: break;
 /* optionally deprecate HANDLE by requiring CATCHANY after IN */
