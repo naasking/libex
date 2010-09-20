@@ -1,90 +1,97 @@
 
 #include <stdio.h>
+#include <assert.h>
+#include <errno.h>
 #include "libex.h"
 
-static FILE* st;
+/* Tests:
+ * 1. returned void, errno test.
+ * 2. returned exc_type test.
+ * 3. returned int return code test.
+ * 4. returned HRESULT test.
+ * 5. returned ok/error int test.
+ * 6. returned NULL, errno test.
+ */
 
-static int sem_init(FILE **f, int i, int j) {
-	return -1;
-}
+#define requires(E) *p++; assert(E)
+#define mark(p) (*(p))++
 
-int randBomb(void)
-{
-    static int seeded = 0;
-    if (!seeded)
-    {
-        srand(time(NULL));
-        seeded = 1;
-    }
-
-    /* Flip a coin. */
-    return (rand() % 5) / 4;
-}
-
-exc_type test() {
-	THROWS(EArgumentInvalid)
-	if (st != NULL) THROW(EArgumentInvalid)
-
-	TRY(char *memBuf) {
-		printf("Allocate a memory buffer.\n");
-		MAYBE(memBuf = (char *) malloc(256 * 1024), errno)
-	} IN {
-		TRY(FILE *fp) {
-			/* Fifty-bomb. */
-			if (randBomb()) THROW(EUnrecoverable)
-			MAYBE(fp = fopen("dummy-file.txt", "w"), errno)
+static exc_type test_unwind_try(exc_type e, int* p) {
+	THROWS(e)
+	TRY() {
+		mark(p);
+		TRY() {
+			mark(p);
+			THROW(e);
+			assert(0);
 		} IN {
-			TRY(FILE* sock) {
-				if (randBomb()) THROW(EUnrecoverable)
-				printf("Open a socket.\n");
-				MAYBE(sock = fopen("foo", "r"), errno)
-			} IN {
-				/*...*/
-				TRY() {
-					if (randBomb()) THROW(EUnrecoverable)
-					printf("Create/grab a semaphore.\n");
-					if (-1 == sem_init(&st, 0, 1)) THROW(errno)
-				} IN {
-					/* ... */
-				} HANDLE CATCH(EUnrecoverable) {
-					fprintf(stderr, "Random exception after shmat()!\n");
-				} CATCHANY {
-					/* semaphore's only available to this process and children. */
-					fprintf(stderr, "sem_init() failed.\n");
-				} FINALLY {
-					fclose(sock);
-					printf("Socket closed!\n");
-				}
-			} HANDLE CATCH (EUnrecoverable) {
-		        fprintf(stderr, "Random exception after fopen()!\n");
-			} CATCHANY {
-				fprintf(stderr, "socket() failed.\n");
-				RETHROW;
-			} FINALLY {
-				fclose(fp);
-				printf("File handle closed!\n");
-			}
-		} HANDLE CATCH (EUnrecoverable) {
-			fprintf(stderr, "Random exception after malloc()!\n");
-		} CATCHANY {
-			fprintf(stderr, "fopen() failed.\n");
-			RETHROW;
+			assert(0);
+		} HANDLE CATCHANY {
+			mark(p);
+			assert(__CUR_EXC__ == e);
+			THROW(EInvalidOp)
+			assert(0);
 		} FINALLY {
-			free(memBuf);
-			printf("Memory buffer freed!\n");
+			mark(p);
+			assert(__CUR_EXC__ != e);
 		}
-	} HANDLE CATCHANY {
-        fprintf(stderr, "malloc() failed.\n");
-		RETHROW;
-    } FINALLY {
-		printf("retVal: %d\n", __CUR_EXC__);
+		ENDTRY;
+		assert(0);
+	} IN {
+		assert(0);
+	} HANDLE CATCH(EInvalidOp) {
+		mark(p);
+		THROW(e)
+	} CATCHANY {
+		assert(0);
+	} FINALLY {
+		mark(p);
 	}
 	DONE;
 }
 
-static int main(char ** argv, size_t argc) {
-	//printf("unit: %d\n", sizeof(unit));
-	//printf("unit: %d\n", sizeof());
-	scanf("\n");
+static exc_type test_unwind_in(exc_type e, int* p) {
+	THROWS(e)
+	TRY() {
+		mark(p);
+	} IN {
+		mark(p);
+		THROW(e);
+		assert(0);
+	} HANDLE CATCHANY {
+		assert(0);
+	} FINALLY {
+		mark(p);
+		assert(__CUR_EXC__ == e);
+	}
+	DONE;
+}
+
+static void set_errno(exc_type e) {
+	errno = e;
+}
+static exc_type test_errno(exc_type e) {
+	THROWS(e)
+	TRY() {
+		CHECK(set_errno(e));
+	} IN {
+		assert(e == ENoError && __CUR_EXC__ == ENoError);
+	} HANDLE CATCHANY {
+		assert(e != ENoError && __CUR_EXC__ != ENoError);
+		RETHROW;
+	} FINALLY {
+		assert(__CUR_EXC__ == e);
+	}
+	DONE;
+}
+
+#define run_test(E) p = 0; assert(E)
+
+int main(char ** argv, size_t argc) {
+	int p;
+	run_test(EUnrecoverable == test_unwind_try(EUnrecoverable, &p) && p == 6);
+	run_test(EUnrecoverable == test_unwind_in(EUnrecoverable, &p) && p == 3);
+	run_test(ENoError == test_errno(ENoError));
+	run_test(EUnrecoverable == test_errno(EUnrecoverable));
 	return 0;
 }

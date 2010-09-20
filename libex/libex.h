@@ -196,7 +196,7 @@ typedef enum exc_type {
 /* FIXME: This is the ugliest part of the package, because I either force every
  * use of THROW to be wrapped in {}, or I forbid users from terminating with
  * a semi-colon ; contrary to typical C style. I can't wrap in do-while because
- * "break" must break out of the *outer* loop.
+ * "break" must break out of the *outer* loop. */
 #define THROW(E) { THROWS = (exc_type)(E); break; }
 
 /* RETHROW re-raises the current exception in the parent scope */
@@ -213,16 +213,19 @@ typedef enum exc_type {
 
 /* FINALLY closes the scope of the exception handling block and designates
  * the start of code that finalizes any allocated resources */
-#define FINALLY break; } } while(0); }
+#define FINALLY THROWS = ENoError; break; } } while(0); }
 
 /* MAYBE raises the exception R if E evaluates to NULL */
-#define MAYBE(E, R) if (NULL == (E)) THROW(R);
+#define MAYBE(E, R) if (NULL == (E)) THROW(R)
 
 /* ERROR raises the exception E if E evaluates to something other than ENoError */
 #define ERROR(E) THROWS = (E); THROWONERROR
 
 /* ERRORE raises the exception R if E evaluates to non-zero */
 #define ERRORE(E, R) if ((E)) THROW(R)
+
+/* set errno to 0, eval the expression, then check errno */
+#define CHECK(E) errno = 0; (E); ERROR(errno)
 
 /* TRY begins the exception handling scope, and accepts a list of declarations D.
  * IN designates the scope which executes if no errors were raised in the
