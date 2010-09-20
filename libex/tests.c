@@ -85,13 +85,51 @@ static exc_type test_errno(exc_type e) {
 	DONE;
 }
 
+static exc_type test_noerr(int* i) {
+	THROWS()
+	TRY() {
+		mark(i);
+		THROW(EUnrecoverable)
+	} IN {
+		assert(0);
+	} HANDLE CATCHANY {
+		mark(i);
+	} FINALLY {
+		mark(i);
+	}
+	DONE;
+}
+static exc_type test_maybe(void *p, int* i) {
+	THROWS(EUnrecoverable)
+	TRY() {
+		mark(i);
+		MAYBE(p, EUnrecoverable);
+	} IN {
+		assert(p != NULL);
+		mark(i);
+	} HANDLE CATCHANY {
+		assert(p == NULL);
+		mark(i);
+		RETHROW;
+	} FINALLY {
+		mark(i);
+	}
+	DONE;
+}
+
 #define run_test(E) p = 0; assert(E)
 
 int main(char ** argv, size_t argc) {
+	/* some tests accept &p as a parameter, and they mark all blocks executed;
+	 * we then compare the executed blocks against the expected number; assert(false)
+	 * is also executed on unexpected branches */
 	int p;
+	run_test(ENoError == test_noerr(&p) && p == 3);
 	run_test(EUnrecoverable == test_unwind_try(EUnrecoverable, &p) && p == 6);
 	run_test(EUnrecoverable == test_unwind_in(EUnrecoverable, &p) && p == 3);
 	run_test(ENoError == test_errno(ENoError));
 	run_test(EUnrecoverable == test_errno(EUnrecoverable));
+	run_test(EUnrecoverable == test_maybe(NULL, &p));
+	run_test(ENoError == test_maybe(&p, &p));
 	return 0;
 }
